@@ -1,0 +1,91 @@
+name: Lighthouse
+
+on:
+  workflow_call:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v3
+
+      - name: Setup node env 🏗
+        uses: actions/setup-node@v3
+        with:
+          node-version: "14.x"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies 👨🏻‍💻
+        run: yarn install
+
+      - name: Copy Env File 📋
+        run: cp .env.example .env
+
+      - name: Build 🏗
+        run: yarn build
+
+      - name: Start server 🚀
+        run: yarn start &
+
+      # - name: Wait for server to start 🕑
+      #   run: sleep 2
+
+      - name: Install jq ⬇️
+        run: sudo apt-get install jq
+
+      - name: Install Chrome ⬇️
+        run: |
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb
+          sudo apt-get install -f
+
+      - name: Install lighthouse ⬇️
+        run: yarn global add lighthouse
+
+      - name: Run lighthouse 📊
+        run: lighthouse http://127.0.0.1:3000 --output json --output-path lighthouse.json --chrome-flags="--headless"
+
+      # - name: Show lighthouse report OLD 📊
+      #   id: report
+      #   run: |
+      #     performance=$(echo "🌩️ Performance: $(cat lighthouse.json | jq '.categories.performance.score')%"); \
+      #     accessibility=$(echo "👓 Accessibility: $(cat lighthouse.json | jq '.categories.accessibility.score')%"); \
+      #     practices=$(echo "👍 Best Practices: $(cat lighthouse.json | jq '.categories["best-practices"].score')%"); \
+      #     seo=$(echo "🌐 SEO: $(cat lighthouse.json | jq '.categories.seo.score')%"); \
+      #     echo "# Lighthouse Report:" > $GITHUB_STEP_SUMMARY; \
+      #     echo "## $performance <br/> $accessibility <br/> $practices <br/> $seo" >> $GITHUB_STEP_SUMMARY; \
+      #     REPORT=$(cat $GITHUB_STEP_SUMMARY); \
+      #     echo "REPORT='$REPORT'" >> $GITHUB_OUTPUT
+
+      - name: Get lighthouse report 📊
+        id: report
+        run: |
+          performance=$(cat lighthouse.json | jq '.categories.performance.score'); \
+          accessibility=$(cat lighthouse.json | jq '.categories.accessibility.score'); \
+          practices=$(cat lighthouse.json | jq '.categories["best-practices"].score'); \
+          seo=$(cat lighthouse.json | jq '.categories.seo.score'); \
+          echo "# Lighthouse Report:" > $GITHUB_STEP_SUMMARY; \
+          echo "## Performance $performance <br/> Accessibility $accessibility <br/> Best practices $practices <br/> SEO $seo" >> $GITHUB_STEP_SUMMARY; \
+          echo "PERFORMANCE=$performance" >> $GITHUB_OUTPUT; \
+          echo "ACCESSIBILITY=$accessibility" >> $GITHUB_OUTPUT; \
+          echo "PRACTICES=$practices" >> $GITHUB_OUTPUT; \
+          echo "SEO=$seo" >> $GITHUB_OUTPUT
+
+      - name: Comment report on pull request 📊
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const performance = ${{steps.report.outputs.PERFORMANCE}} * 100
+            const accessibility = ${{steps.report.outputs.ACCESSIBILITY}} * 100
+            const practices = ${{steps.report.outputs.PRACTICES}} * 100
+            const seo = ${{steps.report.outputs.SEO}} * 100
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `# Lighthouse Report:\n## 🌩️ Performance: ${performance}%\n## 👓 Accessibility: ${accessibility}%\n## 👍 Best Practices: ${practices}%\n## 🌐 SEO: ${seo}%`
+            })
+
