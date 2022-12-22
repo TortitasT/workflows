@@ -47,18 +47,6 @@ jobs:
       - name: Run lighthouse 📊
         run: lighthouse http://127.0.0.1:3000 --output json --output-path lighthouse.json --chrome-flags="--headless"
 
-      # - name: Show lighthouse report OLD 📊
-      #   id: report
-      #   run: |
-      #     performance=$(echo "🌩️ Performance: $(cat lighthouse.json | jq '.categories.performance.score')%"); \
-      #     accessibility=$(echo "👓 Accessibility: $(cat lighthouse.json | jq '.categories.accessibility.score')%"); \
-      #     practices=$(echo "👍 Best Practices: $(cat lighthouse.json | jq '.categories["best-practices"].score')%"); \
-      #     seo=$(echo "🌐 SEO: $(cat lighthouse.json | jq '.categories.seo.score')%"); \
-      #     echo "# Lighthouse Report:" > $GITHUB_STEP_SUMMARY; \
-      #     echo "## $performance <br/> $accessibility <br/> $practices <br/> $seo" >> $GITHUB_STEP_SUMMARY; \
-      #     REPORT=$(cat $GITHUB_STEP_SUMMARY); \
-      #     echo "REPORT='$REPORT'" >> $GITHUB_OUTPUT
-
       - name: Get lighthouse report 📊
         id: report
         run: |
@@ -75,6 +63,7 @@ jobs:
 
       - name: Comment report on pull request 📊
         uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
         with:
           script: |
             const performance = ${{steps.report.outputs.PERFORMANCE}} * 100
@@ -88,4 +77,3 @@ jobs:
               repo: context.repo.repo,
               body: `# Lighthouse Report:\n## 🌩️ Performance: ${performance}%\n## 👓 Accessibility: ${accessibility}%\n## 👍 Best Practices: ${practices}%\n## 🌐 SEO: ${seo}%`
             })
-
